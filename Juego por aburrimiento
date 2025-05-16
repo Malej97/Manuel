@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Atrapa la Fruta</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        #game-container {
+            position: relative;
+            width: 600px;
+            height: 400px;
+            background: linear-gradient(to bottom, #87CEEB, #E0F7FA);
+            overflow: hidden;
+            border-radius: 10px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+        
+        #basket {
+            position: absolute;
+            width: 80px;
+            height: 40px;
+            background-color: #8D6E63;
+            border-radius: 0 0 20px 20px;
+            bottom: 20px;
+            left: 260px;
+        }
+        
+        #basket:before {
+            content: '';
+            position: absolute;
+            width: 90px;
+            height: 10px;
+            background-color: #5D4037;
+            border-radius: 5px;
+            top: -5px;
+            left: -5px;
+        }
+        
+        .fruit {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background-color: red;
+        }
+        
+        #score-display {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 20px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 1px 1px 2px black;
+        }
+        
+        #game-over {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 24px;
+        }
+        
+        #start-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to bottom, #4CAF50, #81C784);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+        }
+        
+        .btn {
+            background-color: #FFC107;
+            color: #333;
+            border: none;
+            padding: 10px 20px;
+            font-size: 18px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: all 0.3s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .btn:hover {
+            background-color: #FFD54F;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 8px rgba(0,0,0,0.15);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+    <div class="text-center">
+        <h1 class="text-4xl font-bold mb-8 text-indigo-600">Atrapa la Fruta</h1>
+        
+        <div id="game-container" class="mx-auto">
+            <div id="start-screen">
+                <h2 class="text-3xl font-bold mb-4">Atrapa la Fruta</h2>
+                <p class="mb-6">Usa las teclas de flecha ← → para mover la canasta</p>
+                <button id="start-btn" class="btn">Comenzar Juego</button>
+            </div>
+            
+            <div id="basket"></div>
+            <div id="score-display">Puntos: 0</div>
+            
+            <div id="game-over">
+                <h2 class="text-3xl font-bold mb-4">¡Juego Terminado!</h2>
+                <p id="final-score" class="mb-6">Puntuación: 0</p>
+                <button id="restart-btn" class="btn">Jugar de Nuevo</button>
+            </div>
+        </div>
+        
+        <div class="mt-8 bg-white p-4 rounded-lg shadow-md max-w-md mx-auto">
+            <h3 class="text-xl font-semibold mb-2">Instrucciones:</h3>
+            <ul class="text-left list-disc pl-5 space-y-1">
+                <li>Atrapa las frutas que caen con la canasta</li>
+                <li>Cada fruta vale 10 puntos</li>
+                <li>Si dejas caer 5 frutas, pierdes</li>
+                <li>Usa las teclas de flecha izquierda y derecha para moverte</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Variables del juego
+        const gameContainer = document.getElementById('game-container');
+        const basket = document.getElementById('basket');
+        const scoreDisplay = document.getElementById('score-display');
+        const gameOverScreen = document.getElementById('game-over');
+        const startScreen = document.getElementById('start-screen');
+        const startBtn = document.getElementById('start-btn');
+        const restartBtn = document.getElementById('restart-btn');
+        const finalScore = document.getElementById('final-score');
+        
+        let score = 0;
+        let missedFruits = 0;
+        let gameRunning = false;
+        let basketPosition = 260;
+        let basketWidth = 80;
+        let gameWidth = 600;
+        let fruits = [];
+        let gameLoop;
+        let fruitInterval;
+        
+        // Event listeners
+        startBtn.addEventListener('click', startGame);
+        restartBtn.addEventListener('click', restartGame);
+        
+        document.addEventListener('keydown', (e) => {
+            if (!gameRunning) return;
+            
+            if (e.key === 'ArrowLeft' && basketPosition > 0) {
+                basketPosition -= 20;
+                if (basketPosition < 0) basketPosition = 0;
+                basket.style.left = basketPosition + 'px';
+            }
+            
+            if (e.key === 'ArrowRight' && basketPosition < gameWidth - basketWidth) {
+                basketPosition += 20;
+                if (basketPosition > gameWidth - basketWidth) basketPosition = gameWidth - basketWidth;
+                basket.style.left = basketPosition + 'px';
+            }
+        });
+        
+        // Funciones del juego
+        function startGame() {
+            score = 0;
+            missedFruits = 0;
+            basketPosition = 260;
+            basket.style.left = basketPosition + 'px';
+            
+            // Limpiar frutas existentes
+            fruits.forEach(fruit => {
+                if (fruit.element && fruit.element.parentNode) {
+                    gameContainer.removeChild(fruit.element);
+                }
+            });
+            fruits = [];
+            
+            // Ocultar pantalla de inicio
+            startScreen.style.display = 'none';
+            gameOverScreen.style.display = 'none';
+            
+            // Actualizar puntuación
+            scoreDisplay.textContent = `Puntos: ${score}`;
+            
+            // Iniciar juego
+            gameRunning = true;
+            
+            // Intervalo para crear frutas
+            fruitInterval = setInterval(createFruit, 1000);
+            
+            // Bucle del juego
+            gameLoop = setInterval(updateGame, 20);
+        }
+        
+        function restartGame() {
+            gameOverScreen.style.display = 'none';
+            startGame();
+        }
+        
+        function createFruit() {
+            if (!gameRunning) return;
+            
+            const fruit = document.createElement('div');
+            fruit.className = 'fruit';
+            
+            // Posición aleatoria en la parte superior
+            const xPos = Math.random() * (gameWidth - 30);
+            fruit.style.left = xPos + 'px';
+            fruit.style.top = '0px';
+            
+            // Color aleatorio
+            const colors = ['#FF5252', '#FFD740', '#69F0AE', '#40C4FF', '#E040FB'];
+            const randomColor = colors[Math.floor(Math.random() * colors.length)];
+            fruit.style.backgroundColor = randomColor;
+            
+            // Añadir al contenedor del juego
+            gameContainer.appendChild(fruit);
+            
+            // Añadir a la lista de frutas
+            fruits.push({
+                element: fruit,
+                x: xPos,
+                y: 0,
+                speed: 2 + Math.random() * 3
+            });
+        }
+        
+        function updateGame() {
+            if (!gameRunning) return;
+            
+            // Mover todas las frutas
+            fruits.forEach((fruit, index) => {
+                fruit.y += fruit.speed;
+                fruit.element.style.top = fruit.y + 'px';
+                
+                // Detectar colisión con la canasta
+                if (fruit.y >= 360 && fruit.y <= 370 && 
+                    fruit.x >= basketPosition - 15 && fruit.x <= basketPosition + basketWidth - 15) {
+                    // Fruta atrapada
+                    gameContainer.removeChild(fruit.element);
+                    fruits.splice(index, 1);
+                    score += 10;
+                    scoreDisplay.textContent = `Puntos: ${score}`;
+                    
+                    // Efecto visual
+                    const effect = document.createElement('div');
+                    effect.style.position = 'absolute';
+                    effect.style.left = fruit.x + 'px';
+                    effect.style.top = '360px';
+                    effect.style.width = '30px';
+                    effect.style.height = '30px';
+                    effect.style.backgroundColor = fruit.element.style.backgroundColor;
+                    effect.style.borderRadius = '50%';
+                    effect.style.opacity = '0.7';
+                    effect.style.transform = 'scale(1)';
+                    effect.style.transition = 'all 0.3s';
+                    gameContainer.appendChild(effect);
+                    
+                    setTimeout(() => {
+                        effect.style.transform = 'scale(2)';
+                        effect.style.opacity = '0';
+                        setTimeout(() => gameContainer.removeChild(effect), 300);
+                    }, 10);
+                }
+                
+                // Fruta que llega al fondo
+                if (fruit.y > 400) {
+                    gameContainer.removeChild(fruit.element);
+                    fruits.splice(index, 1);
+                    missedFruits++;
+                    
+                    if (missedFruits >= 5) {
+                        endGame();
+                    }
+                }
+            });
+        }
+        
+        function endGame() {
+            gameRunning = false;
+            clearInterval(gameLoop);
+            clearInterval(fruitInterval);
+            
+            finalScore.textContent = `Puntuación: ${score}`;
+            gameOverScreen.style.display = 'flex';
+        }
+    </script>
+</body>
+</html>
